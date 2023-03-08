@@ -55,7 +55,7 @@ const externalService = {
       console.log("Error occured>>>", err);
     }
   },
-  getDestinationsData: async (token) => {
+  getAllDestinations: async (token) => {
     try {
       let config = {
         method: "get",
@@ -78,6 +78,24 @@ const externalService = {
       let config = {
         method: "get",
         url: BASE_URL + `/Member`,
+        headers: {
+          Authorization: "Bearer " + token,
+        },
+      };
+
+      const response = await axios(config);
+      const data = response?.data?.value;
+
+      return data;
+    } catch (err) {
+      console.log("Error occured>>>", err);
+    }
+  },
+  getDestinationData: async (token, id) => {
+    try {
+      let config = {
+        method: "get",
+        url: BASE_URL + `/Property/PropertyReplication(DestinationId=${id})`,
         headers: {
           Authorization: "Bearer " + token,
         },
