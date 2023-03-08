@@ -1,41 +1,39 @@
 const dbService = require("./dbService");
 const externalService = require("./externalService");
 require("dotenv").config();
-const fs = require("fs");
-const listsData = require("./listData.json");
-
-(async () => {
+let ko = 0;
+setInterval(async () => {
+  console.log("Started running");
   const token = await externalService.getToken();
   // ==================  //
   // populating the lists table
 
-  // let listsData = await externalService.getAllListData(token);
+  let listsData = await externalService.getAllListData(token);
 
-  // //   converting objects into strings to store in db
-  // listsData = formatDataForDB(listsData);
+  //   converting objects into strings to store in db
+  listsData = formatDataForDB(listsData);
 
-  // //   //   adding "lists" data fetched from api to postgresql db
-  // await dbService.addAllListData(listsData);
+  //   adding "lists" data fetched from api to postgresql db
+  await dbService.addAllListData(listsData);
 
-  // //   ==================== //
-  // // Now populating the listingagentid table-
+  //   ==================== //
+  // Now populating the listingagentid table-
 
-  // // getting data from external api
+  // getting data from external api
 
   const agentsData = await externalService.getAgentsListingData(token);
-  // await dbService.addListingAgentsData(agentsData);
+  await dbService.addListingAgentsData(agentsData);
 
-  // // console.log(agentsData);
-  // //   now inserting this data in db
+  //   now inserting this data in db
 
-  // //   ==================== //
-  // //   Now populating destiantions table
+  //   ==================== //
+  //   Now populating destiantions table
 
-  // // TODO ask the purpose of is deleted in this table
-  // // TODO  can i remove extra fields like listingagentname colistingagentname etc
+  // TODO ask the purpose of is deleted in this table
+  // TODO  can i remove extra fields like listingagentname colistingagentname etc
   const destinationsData = await externalService.getAllDestinations(token);
 
-  // await dbService.addDestinationsData(destinationsData);
+  await dbService.addDestinationsData(destinationsData);
 
   //   ==================== //
 
@@ -55,32 +53,123 @@ const listsData = require("./listData.json");
       dest.DestinationId
     );
 
-    // if there is no data in table add all
-    if (destRows && destRows.length === 0) {
-      console.log("Inserting");
-      const filteredArray = listsData.filter((data) => {
-        const isPresent = destLiveData.find((lData) => {
-          return data.ListingKey === lData.ListingKey;
-        });
-        if (isPresent) return data;
-        else return false;
+    const destinationListingData = listsData.filter((data) => {
+      const isPresent = destLiveData.find((lData) => {
+        return data.ListingKey === lData.ListingKey;
       });
+      if (isPresent) return data;
+      else return false;
+    });
 
-      console.log("Length", filteredArray.length);
-      // console.table(filteredArray.map((d) => ({ ListingKey: d.ListingKey })));
-      // await dbService.populateDestinationTable(
-      //   tableName,
-      //   formatDataForDB(filteredArray),
-      //   dest.DestinationId,
-      //   agentsData
-      // );
+    // if there is no data in table add all
+    if (destRows.length === 0) {
+      await dbService.populateDestinationTable(
+        tableName,
+        formatDataForDB(destinationListingData),
+        dest.DestinationId,
+        agentsData
+      );
+    } else {
+      const newRows = [];
+      await Promise.all(
+        destinationListingData.map(async (listData) => {
+          const dbListData = destRows.find(
+            (d) => d.listingkey === listData.ListingKey
+          );
+          const modifications = { updatedat: new Date() };
+          if (!dbListData) {
+            // so if it not present in db it means its a new entry
+            newRows.push(listData);
+          } else {
+            if (
+              dbListData.modificationtimestamp != listData.ModificationTimestamp
+            ) {
+              // if the modification timestap is different than the one in db
+              // it means its updates
+
+              // we will check what is updated and will update accordingly in db
+
+              if (dbListData.listprice != listData.ListPrice) {
+                modifications.listprice = listData.ListPrice;
+                modifications.listprice_old = dbListData.listprice;
+              }
+
+              if (dbListData.bedroomstotal != listData.BedroomsTotal) {
+                modifications.bedroomstotal = listData.BedroomsTotal;
+                modifications.bedroomstotal_old = dbListData.bedroomstotal;
+              }
+
+              if (dbListData.publicremarks != listData.PublicRemarks) {
+                modifications.publicremarks = listData.BedroomsTotal;
+                modifications.publicremarks_old = dbListData.bedroomstotal;
+              }
+              if (
+                dbListData.bathroomstotalinteger !=
+                listData.BathroomsTotalInteger
+              ) {
+                modifications.bathroomstotalinteger =
+                  listData.BathroomsTotalInteger;
+                modifications.bathroomstotalinteger_old =
+                  dbListData.bathroomstotalinteger;
+              }
+              if (dbListData.buildingareatotal != listData.BuildingAreaTotal) {
+                modifications.buildingareatotal = listData.BuildingAreaTotal;
+                modifications.buildingareatotal_old =
+                  dbListData.buildingareatotal;
+              }
+            }
+          } //END MAIN IF
+
+          // now we have all the modifications
+          // console.table(Object.keys(modifications).length);
+          if (Object.keys(modifications).length > 1) {
+            console.table(modifications);
+            await dbService.updateDestinationTable(
+              tableName,
+              listData.ListingKey,
+              modifications
+            );
+          }
+        })
+      );
+      if (newRows.length > 0) {
+        console.log("updating and adding new Rows");
+        await dbService.populateDestinationTable(
+          tableName,
+          formatDataForDB(newRows),
+          dest.DestinationId,
+          agentsData
+        );
+      }
+
+      const deletedRows = [];
+      // now marking deleted rows in db
+      destRows.map(async (d) => {
+        if (
+          !destinationListingData.find(
+            (listData) => d.listingkey === listData.ListingKey
+          )
+        ) {
+          deletedRows.push(d.listingkey);
+        }
+      });
+      if (deletedRows.length > 0) {
+        await Promise.all(
+          deletedRows.map(async (id) => {
+            await dbService.updateDestinationTable(tableName, id, {
+              isdeleted: "DELETED",
+              updatedat: new Date(),
+            });
+          })
+        );
+      }
+
+      console.log("Deleted rows marked");
     }
-
-    // listsData
-
-    // console.log(destLiveData);
-  }
-})();
+  } // end for loop
+  console.log("Ended running", ko);
+  ko++;
+}, 60 * 6000);
 
 function formatDataForDB(data) {
   return data.reduce((acc, obj) => {

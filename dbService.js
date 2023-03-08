@@ -1,7 +1,5 @@
 const { Pool } = require("pg");
 const format = require("pg-format");
-const fs = require("fs");
-const { takeCoverage } = require("v8");
 const dbService = {
   addAllListData: async (allData) => {
     const pool = new Pool({
@@ -235,18 +233,18 @@ const dbService = {
     // TODO do you want to keep all the deleted rows in the destinations table till date
     // if yes then we will have to apply condition where isDeleted != "deleted"
 
-    // const res = await pool.query(
-    //   `select * from ${tableName}`
-    //   // , (err, res) => {
-    //   //   if (err)
-    //   //     console.log(
-    //   //       `**Error While selecting data from table ${tableName}`,
-    //   //       err
-    //   //     );
-    //   //   else console.log("Query executed");
-    //   // }
-    // );
-    // return res.rows;
+    const res = await pool.query(
+      `select * from ${tableName}`
+      // , (err, res) => {
+      //   if (err)
+      //     console.log(
+      //       `**Error While selecting data from table ${tableName}`,
+      //       err
+      //     );
+      //   else console.log("Query executed");
+      // }
+    );
+    return res.rows;
   },
   populateDestinationTable: async (
     tableName,
@@ -387,9 +385,52 @@ const dbService = {
     );
 
     const res = await pool.query(destinationsSpecificQuery, (err, res) => {
-      console.log(err);
+      if (err) {
+        console.log("Error occured while populating", allData, err);
+        throw new Error(err);
+      }
     });
     pool.end();
+  },
+  updateDestinationTable: async (tableName, listingkey, modifications) => {
+    const pool = new Pool({
+      user: process.env.DB_USER,
+      host: process.env.DB_HOST,
+      database: process.env.DB_DATABASE,
+      password: process.env.DB_PASSWORD,
+      port: process.env.DB_PORT,
+      ssl: true,
+    });
+
+    let modNames = "";
+
+    Object.keys(modifications).map((key, index, arr) => {
+      modNames += `${key}=$${index + 1}${
+        index + 1 === arr.length ? " " : ", "
+      }`;
+    });
+    const modData = Object.keys(modifications).map((key, index) => {
+      return modifications[key];
+    });
+
+    console.log("==========");
+    console.log(modNames);
+    console.table(modData);
+
+    await pool.query(
+      `UPDATE ${tableName} SET ${modNames} where listingkey=${listingkey};`,
+      modData,
+      (err, res) => {
+        if (err) {
+          console.log("error occured here", err);
+          console.log(
+            `UPDATE ${tableName} SET ${modNames} where listingkey=${listingkey};`,
+            modData
+          );
+          throw new Error(err);
+        }
+      }
+    );
   },
 };
 module.exports = dbService;
