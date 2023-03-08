@@ -1,6 +1,7 @@
 const { Pool } = require("pg");
 const format = require("pg-format");
 const fs = require("fs");
+const { takeCoverage } = require("v8");
 const dbService = {
   addAllListData: async (allData) => {
     const pool = new Pool({
@@ -214,7 +215,7 @@ const dbService = {
     });
   },
 
-  cerateSeparateDestination: async (tableName) => {
+  createSeparateDestination: async (tableName) => {
     const pool = new Pool({
       user: process.env.DB_USER,
       host: process.env.DB_HOST,
@@ -224,7 +225,7 @@ const dbService = {
       ssl: true,
     });
     pool.query(
-      `CREATE TABLE IF NOT EXISTS ${tableName} (listingkey bigint,listingagentname text,colistingagentname text,destinationid bigint ,listofficekey bigint,availabilitydate bigint,propertysubtype text,documentsavailable json,leaseamount double precision,leaseamountfrequency bigint,businesstype json,waterbodyname bigint,view json,numberofbuildings bigint,numberofunitstotal bigint,lotfeatures json,lotsizearea double precision,lotsizedimensions text,lotsizeunits text,poolfeatures json,roadsurfacetype json,currentuse json,possibleuse json,anchorscotenants bigint,waterfrontfeatures json,communityfeatures json,appliances json,otherequipment json,securityfeatures json,totalactualrent double precision,existingleasetype json,associationfee double precision,associationfeefrequency text,associationname text,associationfeeincludes json,originalentrytimestamp text,modificationtimestamp text,listingid bigint,internetentirelistingdisplayyn boolean,standardstatus text, statuschangetimestamp text, publicremarks text, publicremarks_old text,listprice bigint,listprice_old bigint,inclusions bigint,colistofficekey bigint,colistagentkey bigint,listagentkey bigint, internetaddressdisplayyn boolean,listingurl text,originatingsystemname text,photoscount bigint,photoschangetimestamp text,unparsedaddress text,postalcode text,subdivisionname bigint,stateorprovince text,streetdirprefix bigint,streetdirsuffix text,streetname text,streetnumber bigint,streetsuffix text,unitnumber text, country text, city text,directions bigint,latitude double precision,longitude double precision,cityregion text,parkingtotal bigint,yearbuilt bigint, bathroomspartial bigint,bathroomstotalinteger bigint,bathroomstotalinteger_old bigint, bedroomstotal bigint, bedroomstotal_old bigint, buildingareatotal bigint, buildingareatotal_old bigint,buildingareaunits text,buildingfeatures json,abovegradefinishedarea bigint,abovegradefinishedareaunits bigint,livingarea bigint,livingareaunits text,fireplacestotal bigint,fireplaceyn boolean,fireplacefeatures json,architecturalstyle json,heating json,foundationdetails json,basement json,exteriorfeatures json, flooring json,parkingfeatures json,cooling json,propertycondition json, roof json,constructionmaterials json,stories character varying,propertyattachedyn character varying,zoning character varying,zoningdescription character varying,taxannualamount double precision,taxblock bigint ,taxlot bigint, taxyear bigint, structuretype json,utilities json,irrigationsource json,watersource json,sewer json,electric json,commoninterest text,media json,rooms json,isdeleted text,createdat text,updatedat text)`,
+      `CREATE TABLE IF NOT EXISTS ${tableName} (listingkey bigint NULL, listingagentname text NULL, colistingagentname text NULL, destinationid bigint  NULL, listofficekey bigint NULL, availabilitydate bigint NULL, propertysubtype text NULL, documentsavailable json NULL, leaseamount double precision NULL, leaseamountfrequency bigint NULL, businesstype json NULL, waterbodyname bigint NULL, view json NULL, numberofbuildings bigint NULL, numberofunitstotal bigint NULL, lotfeatures json NULL, lotsizearea double precision NULL, lotsizedimensions text NULL, lotsizeunits text NULL, poolfeatures json NULL, roadsurfacetype json NULL, currentuse json NULL, possibleuse json NULL, anchorscotenants bigint NULL, waterfrontfeatures json NULL, communityfeatures json NULL, appliances json NULL, otherequipment json NULL, securityfeatures json NULL, totalactualrent double precision NULL, existingleasetype json NULL, associationfee double precision NULL, associationfeefrequency text NULL, associationname text NULL, associationfeeincludes json NULL, originalentrytimestamp text NULL, modificationtimestamp text NULL, listingid bigint NULL, internetentirelistingdisplayyn boolean NULL, standardstatus text NULL,  statuschangetimestamp text NULL,  publicremarks text NULL,  publicremarks_old text NULL, listprice bigint NULL, listprice_old bigint NULL, inclusions bigint NULL, colistofficekey bigint NULL, colistagentkey bigint NULL, listagentkey bigint NULL,  internetaddressdisplayyn boolean NULL, listingurl text NULL, originatingsystemname text NULL, photoscount bigint NULL, photoschangetimestamp text NULL, unparsedaddress text NULL, postalcode text NULL, subdivisionname bigint NULL, stateorprovince text NULL, streetdirprefix bigint NULL, streetdirsuffix text NULL, streetname text NULL, streetnumber bigint NULL, streetsuffix text NULL, unitnumber text NULL,  country text NULL,  city text NULL, directions bigint NULL, latitude double precision NULL, longitude double precision NULL, cityregion text NULL, parkingtotal bigint NULL, yearbuilt bigint NULL,  bathroomspartial bigint NULL, bathroomstotalinteger bigint NULL, bathroomstotalinteger_old bigint NULL,  bedroomstotal bigint NULL,  bedroomstotal_old bigint NULL,  buildingareatotal bigint NULL,  buildingareatotal_old bigint NULL, buildingareaunits text NULL, buildingfeatures json NULL, abovegradefinishedarea bigint NULL, abovegradefinishedareaunits bigint NULL, livingarea bigint NULL, livingareaunits text NULL, fireplacestotal bigint NULL, fireplaceyn boolean NULL, fireplacefeatures json NULL, architecturalstyle json NULL, heating json NULL, foundationdetails json NULL, basement json NULL, exteriorfeatures json NULL,  flooring json NULL, parkingfeatures json NULL, cooling json NULL, propertycondition json NULL,  roof json NULL, constructionmaterials json NULL, stories character varying NULL, propertyattachedyn character varying NULL, zoning character varying NULL, zoningdescription character varying NULL, taxannualamount double precision NULL, taxblock bigint  NULL, taxlot bigint NULL,  taxyear bigint NULL,  structuretype json NULL, utilities json NULL, irrigationsource json NULL, watersource json NULL, sewer json NULL, electric json NULL, commoninterest text NULL, media json NULL, rooms json NULL, isdeleted text NULL, createdat text NULL, updatedat text NULL)`,
       (err, res) => {
         if (err) console.log(`**Error While creating table ${tableName}`, err);
         else console.log("Query executed");
@@ -234,18 +235,18 @@ const dbService = {
     // TODO do you want to keep all the deleted rows in the destinations table till date
     // if yes then we will have to apply condition where isDeleted != "deleted"
 
-    const res = await pool.query(
-      `select * from ${tableName}`
-      // , (err, res) => {
-      //   if (err)
-      //     console.log(
-      //       `**Error While selecting data from table ${tableName}`,
-      //       err
-      //     );
-      //   else console.log("Query executed");
-      // }
-    );
-    return res.rows;
+    // const res = await pool.query(
+    //   `select * from ${tableName}`
+    //   // , (err, res) => {
+    //   //   if (err)
+    //   //     console.log(
+    //   //       `**Error While selecting data from table ${tableName}`,
+    //   //       err
+    //   //     );
+    //   //   else console.log("Query executed");
+    //   // }
+    // );
+    // return res.rows;
   },
   populateDestinationTable: async (
     tableName,
@@ -253,6 +254,7 @@ const dbService = {
     destinationId,
     agentData
   ) => {
+    console.log("Started execution", tableName);
     const pool = new Pool({
       user: process.env.DB_USER,
       host: process.env.DB_HOST,
@@ -383,10 +385,7 @@ const dbService = {
         return f;
       })
     );
-    fs.writeFile("Output.txt", destinationsSpecificQuery, (err) => {
-      // In case of a error throw err.
-      if (err) throw err;
-    });
+
     const res = await pool.query(destinationsSpecificQuery, (err, res) => {
       console.log(err);
     });

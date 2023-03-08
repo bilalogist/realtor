@@ -1,28 +1,18 @@
 const dbService = require("./dbService");
 const externalService = require("./externalService");
 require("dotenv").config();
+const fs = require("fs");
+const listsData = require("./listData.json");
 
 (async () => {
   const token = await externalService.getToken();
-
   // ==================  //
   // populating the lists table
 
-  let listsData = await externalService.getAllListData(token);
+  // let listsData = await externalService.getAllListData(token);
 
   // //   converting objects into strings to store in db
-  // listsData = listsData.reduce((acc, obj) => {
-  //   const updatedObj = {};
-  //   Object.entries(obj).forEach(([key, value]) => {
-  //     updatedObj[key] =
-  //       Array.isArray(value) && value.length === 0
-  //         ? "[]"
-  //         : Array.isArray(value) && value.length !== 0
-  //         ? JSON.stringify(value)
-  //         : value;
-  //   });
-  //   return [...acc, updatedObj];
-  // }, []);
+  // listsData = formatDataForDB(listsData);
 
   // //   //   adding "lists" data fetched from api to postgresql db
   // await dbService.addAllListData(listsData);
@@ -56,7 +46,7 @@ require("dotenv").config();
     const tableName = `des${dest.DestinationId}`;
 
     // create separate destination table and if it exists return its rows
-    // const destRows = await dbService.cerateSeparateDestination(tableName);
+    const destRows = await dbService.createSeparateDestination(tableName);
 
     // get updated destination id from external api
 
@@ -66,20 +56,24 @@ require("dotenv").config();
     );
 
     // if there is no data in table add all
-    if (true || (destRows && destRows.length === 0)) {
+    if (destRows && destRows.length === 0) {
       console.log("Inserting");
       const filteredArray = listsData.filter((data) => {
-        return destLiveData.find(
-          (lData) => data.ListingKey === lData.ListingKey
-        );
+        const isPresent = destLiveData.find((lData) => {
+          return data.ListingKey === lData.ListingKey;
+        });
+        if (isPresent) return data;
+        else return false;
       });
 
-      await dbService.populateDestinationTable(
-        tableName,
-        filteredArray,
-        dest.DestinationId,
-        agentsData
-      );
+      console.log("Length", filteredArray.length);
+      // console.table(filteredArray.map((d) => ({ ListingKey: d.ListingKey })));
+      // await dbService.populateDestinationTable(
+      //   tableName,
+      //   formatDataForDB(filteredArray),
+      //   dest.DestinationId,
+      //   agentsData
+      // );
     }
 
     // listsData
@@ -87,3 +81,18 @@ require("dotenv").config();
     // console.log(destLiveData);
   }
 })();
+
+function formatDataForDB(data) {
+  return data.reduce((acc, obj) => {
+    const updatedObj = {};
+    Object.entries(obj).forEach(([key, value]) => {
+      updatedObj[key] =
+        Array.isArray(value) && value.length === 0
+          ? "[]"
+          : Array.isArray(value) && value.length !== 0
+          ? JSON.stringify(value)
+          : value;
+    });
+    return [...acc, updatedObj];
+  }, []);
+}
