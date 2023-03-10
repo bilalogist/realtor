@@ -1,9 +1,20 @@
 const dbService = require("./dbService");
 const externalService = require("./externalService");
 require("dotenv").config();
-let ko = 0;
-setInterval(async () => {
-  console.log("Started running");
+let iteration = 0;
+
+setTimeout(async () => {
+  console.log("Started running", iteration);
+  iteration++;
+
+  await main();
+  setInterval(async () => {
+    console.log("Started running", iteration);
+    iteration++;
+    await main();
+  }, 6000 * 10);
+}, 0);
+async function main() {
   const token = await externalService.getToken();
   // ==================  //
   // populating the lists table
@@ -123,7 +134,6 @@ setInterval(async () => {
           // now we have all the modifications
           // console.table(Object.keys(modifications).length);
           if (Object.keys(modifications).length > 1) {
-            console.table(modifications);
             await dbService.updateDestinationTable(
               tableName,
               listData.ListingKey,
@@ -133,7 +143,6 @@ setInterval(async () => {
         })
       );
       if (newRows.length > 0) {
-        console.log("updating and adding new Rows");
         await dbService.populateDestinationTable(
           tableName,
           formatDataForDB(newRows),
@@ -163,13 +172,9 @@ setInterval(async () => {
           })
         );
       }
-
-      console.log("Deleted rows marked");
     }
   } // end for loop
-  console.log("Ended running", ko);
-  ko++;
-}, 60 * 6000);
+}
 
 function formatDataForDB(data) {
   return data.reduce((acc, obj) => {
